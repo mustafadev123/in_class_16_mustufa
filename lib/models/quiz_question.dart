@@ -42,7 +42,8 @@ class QuizQuestion {
     if (question.isEmpty ||
         choices.any((choice) => choice.isEmpty) ||
         choices.toSet().length != 4) {
-      throw const FormatException('Question has empty or duplicate decoded text.');
+      throw const FormatException(
+          'Question has empty or duplicate decoded text.');
     }
     choices.shuffle(random ?? Random.secure());
     return QuizQuestion._(
@@ -52,4 +53,3 @@ class QuizQuestion {
     );
   }
 }
-

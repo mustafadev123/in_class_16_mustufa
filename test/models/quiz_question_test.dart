@@ -22,7 +22,10 @@ void main() {
 
   test('rejects duplicate decoded choices', () {
     expect(
-      () => QuizQuestion.fromJson({...valid, 'incorrect_answers': ['Yes', 'No', 'Maybe']}),
+      () => QuizQuestion.fromJson({
+        ...valid,
+        'incorrect_answers': ['Yes', 'No', 'Maybe']
+      }),
       throwsFormatException,
     );
   });
