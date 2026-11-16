@@ -6,8 +6,9 @@ build/
 *.iml
 android/.gradle/
 android/local.properties
-firebase_options.dart
 google-services.json
+firebase-debug.log
+ICA16_A_*.apk
 GoogleService-Info.plist
 *.jks
 *.keystore

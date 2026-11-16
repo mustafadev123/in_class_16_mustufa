@@ -20,11 +20,13 @@ class QuestionService {
 
   Future<List<QuizQuestion>> fetchQuestions() async {
     final now = DateTime.now();
-    if (_lastRequestAt != null && now.difference(_lastRequestAt!).inSeconds < 5) {
+    if (_lastRequestAt != null &&
+        now.difference(_lastRequestAt!).inSeconds < 5) {
       throw StateError('Please wait five seconds before retrying.');
     }
     _lastRequestAt = now;
-    final response = await _client.get(uri).timeout(const Duration(seconds: 10));
+    final response =
+        await _client.get(uri).timeout(const Duration(seconds: 10));
     if (response.statusCode != 200) {
       throw QuestionRequestException('HTTP ${response.statusCode}');
     }
@@ -32,17 +34,20 @@ class QuestionService {
     try {
       decoded = jsonDecode(response.body);
     } on FormatException {
-      throw const QuestionRequestException('The question service returned bad JSON.');
+      throw const QuestionRequestException(
+          'The question service returned bad JSON.');
     }
     if (decoded is! Map<String, dynamic>) {
       throw const QuestionRequestException('Unexpected response shape.');
     }
     if (decoded['response_code'] != 0) {
-      throw QuestionRequestException('OpenTDB code ${decoded['response_code']}');
+      throw QuestionRequestException(
+          'OpenTDB code ${decoded['response_code']}');
     }
     final results = decoded['results'];
     if (results is! List || results.length != 10) {
-      throw const QuestionRequestException('Exactly 10 questions are required.');
+      throw const QuestionRequestException(
+          'Exactly 10 questions are required.');
     }
     try {
       return List.unmodifiable(results.map((raw) {
@@ -63,4 +68,3 @@ class QuestionRequestException implements Exception {
   @override
   String toString() => message;
 }
-

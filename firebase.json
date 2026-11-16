@@ -1,6 +1,1 @@
-{
-  "firestore": {
-    "rules": "firestore.rules"
-  }
-}
-
+{"firestore":{"rules":"firestore.rules"},"flutter":{"platforms":{"android":{"default":{"projectId":"ica16-a-mustufa","appId":"1:27921486733:android:dad592330b87baecd263c4","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"ica16-a-mustufa","configurations":{"android":"1:27921486733:android:dad592330b87baecd263c4"}}}}}}
