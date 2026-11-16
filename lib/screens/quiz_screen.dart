@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../models/quiz_question.dart';
@@ -262,6 +263,30 @@ class _QuizScreenState extends State<QuizScreen> {
                 'Your answer: ${selections[i]}\nCorrect: ${questions[i].correctAnswer}'),
           ),
         const SizedBox(height: 12),
+        if (kDebugMode) ...[
+          const Text('[DEVELOPMENT FAULT INJECTION]',
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          Wrap(spacing: 6, children: [
+            OutlinedButton(
+                onPressed: () => _setFault(FaultInjection.none),
+                child: const Text('Fault: none')),
+            OutlinedButton(
+                onPressed: () => _setFault(FaultInjection.hideAcknowledgement),
+                child: const Text('Fault: hide acknowledgement')),
+            OutlinedButton(
+                onPressed: () => _setFault(FaultInjection.unavailable),
+                child: const Text('Fault: unavailable')),
+            OutlinedButton(
+                onPressed: () => _setFault(FaultInjection.resourceExhausted),
+                child: const Text('Fault: resource exhausted')),
+            OutlinedButton(
+                onPressed: _runT11,
+                child: const Text('Run T11 deployed rule attacks')),
+            OutlinedButton(
+                onPressed: _runGraduateContention,
+                child: const Text('Run G01/G02 deployed contention')),
+          ]),
+        ],
         Text(message,
             style: TextStyle(
                 color: view == RoundView.cloudVerified
@@ -287,9 +312,47 @@ class _QuizScreenState extends State<QuizScreen> {
             child: const Text('Replay with new round ID')),
       ]);
 
+  void _setFault(FaultInjection fault) {
+    setState(() {
+      widget.attempts.fault = fault;
+      message = '[INJECTED] ${fault.name} selected for development testing.';
+    });
+  }
+
+  Future<void> _runT11() async {
+    setState(() => message = '[TEST] Running T11 against deployed rules…');
+    try {
+      final result = await widget.attempts.runDeployedRuleAttacks(
+          uid: widget.user.uid, roundId: roundId, correctCount: score);
+      if (mounted) setState(() => message = result);
+    } catch (error) {
+      if (mounted) setState(() => message = 'T11 FAILED: $error');
+    }
+  }
+
+  Future<void> _runGraduateContention() async {
+    setState(() => message = '[TEST] Running G01/G02 against deployed cloud…');
+    try {
+      final result = await widget.attempts
+          .runGraduateContention(uid: widget.user.uid, correctCount: score);
+      if (mounted) setState(() => message = result);
+    } catch (error) {
+      if (mounted) setState(() => message = 'G01/G02 FAILED: $error');
+    }
+  }
+
   Future<void> _submit() async => _runSubmission(() => widget.attempts
       .createOnce(uid: widget.user.uid, roundId: roundId, correctCount: score));
-  Future<void> _reconcile() async => _runSubmission(() async {});
+  Future<void> _reconcile() async => _runSubmission(() async {
+        try {
+          await widget.attempts.verifyServer(
+              uid: widget.user.uid, roundId: roundId, correctCount: score);
+        } on AttemptFailure catch (error) {
+          if (error.kind != AttemptFailureKind.notFound) rethrow;
+          await widget.attempts.createOnce(
+              uid: widget.user.uid, roundId: roundId, correctCount: score);
+        }
+      });
 
   Future<void> _runSubmission(Future<void> Function() operation) async {
     final initiatingUid = widget.user.uid;
@@ -329,6 +392,7 @@ class _QuizScreenState extends State<QuizScreen> {
             RoundView.permissionDenied,
           AttemptFailureKind.verificationUnavailable =>
             RoundView.verificationUnavailable,
+          AttemptFailureKind.notFound => RoundView.verificationUnavailable,
           AttemptFailureKind.collision ||
           AttemptFailureKind.resourceExhausted =>
             RoundView.readyToSubmit,

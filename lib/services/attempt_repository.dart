@@ -8,6 +8,7 @@ enum AttemptFailureKind {
   unauthenticated,
   unavailable,
   resourceExhausted,
+  notFound,
   verificationUnavailable
 }
 
@@ -99,7 +100,11 @@ class AttemptRepository {
     try {
       final snapshot =
           await _ref(uid, roundId).get(const GetOptions(source: Source.server));
-      if (!snapshot.exists || snapshot.metadata.hasPendingWrites) {
+      if (!snapshot.exists) {
+        throw const AttemptFailure(AttemptFailureKind.notFound,
+            'Server confirmed this round is not saved yet.');
+      }
+      if (snapshot.metadata.hasPendingWrites) {
         throw const AttemptFailure(AttemptFailureKind.verificationUnavailable,
             'Server did not return a committed document.');
       }
@@ -143,5 +148,75 @@ class AttemptRepository {
                 : AttemptFailureKind.unavailable,
             error.message ?? error.code);
     }
+  }
+
+  Future<String> runDeployedRuleAttacks({
+    required String uid,
+    required String roundId,
+    required int correctCount,
+  }) async {
+    fault = FaultInjection.none;
+    await createOnce(uid: uid, roundId: roundId, correctCount: correctCount);
+    final attempts =
+        firestore.collection('users').doc(uid).collection('attempts');
+
+    Future<bool> denied(Future<void> operation) async {
+      try {
+        await operation;
+        return false;
+      } on FirebaseException catch (error) {
+        return error.code == 'permission-denied';
+      }
+    }
+
+    final scoreDenied = await denied(attempts.doc().set({
+      ..._fixedPayload(11),
+      'submittedAt': FieldValue.serverTimestamp(),
+    }));
+    final extraDenied = await denied(attempts.doc().set({
+      ..._fixedPayload(correctCount),
+      'submittedAt': FieldValue.serverTimestamp(),
+      'extra': true,
+    }));
+    final updateDenied = await denied(_ref(uid, roundId).update({
+      'correctCount': correctCount == 10 ? 9 : correctCount + 1,
+    }));
+    await verifyServer(uid: uid, roundId: roundId, correctCount: correctCount);
+    if (!(scoreDenied && extraDenied && updateDenied)) {
+      throw StateError('At least one invalid deployed request was not denied.');
+    }
+    return 'T11 PASS: score 11, extra field, and update denied; original verified.';
+  }
+
+  Future<String> runGraduateContention({
+    required String uid,
+    required int correctCount,
+  }) async {
+    fault = FaultInjection.none;
+    final concurrentId = newRoundId(uid);
+    await Future.wait([
+      createOnce(uid: uid, roundId: concurrentId, correctCount: correctCount),
+      createOnce(uid: uid, roundId: concurrentId, correctCount: correctCount),
+    ]);
+    await verifyServer(
+        uid: uid, roundId: concurrentId, correctCount: correctCount);
+    var collisionPreserved = false;
+    try {
+      await createOnce(
+          uid: uid,
+          roundId: concurrentId,
+          correctCount: correctCount == 10 ? 9 : correctCount + 1);
+    } on AttemptFailure catch (error) {
+      collisionPreserved = error.kind == AttemptFailureKind.collision;
+    }
+    await verifyServer(
+        uid: uid, roundId: concurrentId, correctCount: correctCount);
+    if (!collisionPreserved) {
+      throw StateError('Different-score collision was not preserved.');
+    }
+    final suffix = concurrentId.length > 6
+        ? concurrentId.substring(concurrentId.length - 6)
+        : concurrentId;
+    return 'G01/G02 PASS: concurrent match reused one document; different score collided; …$suffix';
   }
 }
