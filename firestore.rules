@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedInAs(uid) { return request.auth != null && request.auth.uid == uid; }
+    function exactAttemptKeys() {
+      return request.resource.data.keys().hasOnly([
+        'schemaVersion', 'variant', 'categoryId', 'questionCount',
+        'correctCount', 'submittedAt'
+      ]);
+    }
+    function validAttempt() {
+      return exactAttemptKeys()
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.variant == 'A'
+        && request.resource.data.categoryId == 9
+        && request.resource.data.questionCount == 10
+        && request.resource.data.correctCount is int
+        && request.resource.data.correctCount >= 0
+        && request.resource.data.correctCount <= 10
+        && request.resource.data.submittedAt == request.time;
+    }
+
+    match /users/{uid}/attempts/{roundId} {
+      allow create: if signedInAs(uid) && validAttempt();
+      allow get: if signedInAs(uid);
+      allow list, update, delete: if false;
+    }
+  }
+}
+

@@ -131,7 +131,15 @@ class _QuizScreenState extends State<QuizScreen> {
       }
     } on AttemptFailure catch (error) {
       if (!mounted) return;
-      setState(() { view = error.view; message = error.message; });
+      setState(() {
+        view = switch (error.kind) {
+          AttemptFailureKind.permissionDenied || AttemptFailureKind.unauthenticated => RoundView.permissionDenied,
+          AttemptFailureKind.verificationUnavailable => RoundView.verificationUnavailable,
+          AttemptFailureKind.collision || AttemptFailureKind.resourceExhausted => RoundView.readyToSubmit,
+          AttemptFailureKind.unavailable => RoundView.saveUnknown,
+        };
+        message = error.message;
+      });
     } catch (error) {
       if (mounted) setState(() { view = RoundView.saveUnknown; message = 'Save result unknown. Reconcile this same round. $error'; });
     }
