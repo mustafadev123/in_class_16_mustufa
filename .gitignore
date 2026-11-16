@@ -1,0 +1,14 @@
+.dart_tool/
+.flutter-plugins*
+.packages
+build/
+.idea/
+*.iml
+android/.gradle/
+android/local.properties
+firebase_options.dart
+google-services.json
+GoogleService-Info.plist
+*.jks
+*.keystore
+
